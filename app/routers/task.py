@@ -5,6 +5,7 @@ from app.schemas.task import TaskCreateSchema, TaskReadSchema, TaskUpdateSchema
 from app.models.task import TaskModel
 from typing import List
 from fastapi import HTTPException
+import logging
 
 router = APIRouter(prefix="/tasks", tags=["Задачи"])
 
@@ -13,6 +14,7 @@ router = APIRouter(prefix="/tasks", tags=["Задачи"])
 async def get_all_tasks(db: SessionDep) -> List[TaskReadSchema]:
     result = await db.execute(select(TaskModel))
     tasks = result.scalars().all()
+    logging.info(f'Пользователь запросил /tasks/ и сервер вернул {len(tasks)} тасок!')
     return tasks
 
 
@@ -22,6 +24,7 @@ async def create_task(db: SessionDep, data: TaskCreateSchema) -> TaskReadSchema:
     db.add(new_task)
     await db.commit()
     await db.refresh(new_task)
+    logging.info(f'Пользователь создал новую таску - {new_task.title}!')
     return new_task
 
 
@@ -32,6 +35,7 @@ async def update_task(
     result = await db.execute(select(TaskModel).filter(TaskModel.id == id))
     task = result.scalars().first()
     if not task:
+        logging.info(f"Пользователь попытался найти таску но таски с таким ID ({id}) не существует!")
         return HTTPException(status_code=404, detail="No task found!")
 
     for key, value in data.model_dump(exclude_unset=True).items():
@@ -39,7 +43,7 @@ async def update_task(
 
     await db.commit()
     await db.refresh(task)
-
+    logging.info(f'Пользователь изменил таску - {task.title}!')
     return task
 
 
@@ -50,7 +54,10 @@ async def get_task_by_id(
     result = await db.execute(select(TaskModel).filter(TaskModel.id == id))
     task = result.scalars().first()
     if not task:
+        logging.info(f"Пользователь попытался найти таску но таски с таким ID ({id}) не существует!")
         return HTTPException(status_code=404, detail="No task found!")
+    
+    logging.info(f'Пользователь получил таску по ID ({id}) - {task.id}-{task.title}!')
     return task
 
 @router.delete("/{id}", summary="Удалить задание")
@@ -60,8 +67,11 @@ async def delete_task(
     result = await db.execute(select(TaskModel).filter(TaskModel.id == id))
     task = result.scalars().first()
     if not task:
+        logging.info(f"Пользователь попытался найти таску но таски с таким ID ({id}) не существует!")
         return HTTPException(status_code=404, detail="No task found!")
     await db.delete(task)
     await db.commit()
+    logging.info(f'Пользователь удалил таску по ID ({id})')
+
     return {'success': True}
 
